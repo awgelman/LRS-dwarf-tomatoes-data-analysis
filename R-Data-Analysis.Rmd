@@ -1,0 +1,395 @@
+---
+title: "Thesis Data Analysis"
+author: "Adam W. Gelman"
+date: "`r Sys.Date()`"
+output: pdf_document
+header-includes:
+  - \usepackage{changepage}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, tidy=TRUE, include=TRUE)
+library(rempsyc)
+library(broom)
+require(tinytex)
+require(xtable)
+require(olsrr)
+require(mosaic)
+require(Sleuth2)
+require(leaps)
+require(MASS)
+require(effectsize)
+require(flextable)
+require(report)
+```
+
+```{r Data_Import, echo=FALSE}
+library(readxl)
+Master_Spreadsheet <- read_excel("Master_Spreadsheet.xlsx", na = ".")
+```
+
+# Single-Variable t-Test p-Values by Response Variable
+
+\begin{adjustwidth}{2cm}{2cm}
+
+The following table compares the performance of plants grown in 
+Perlite with those grown in Regolith without considering microbial
+inoculation. P-values greater than 0.05 indicate a high probability 
+that the observed difference occurred due to random chance.
+
+\end{adjustwidth}
+
+```{r Substrate-t-Tests, echo=FALSE, results='asis', fig.width=6.5}
+
+table1=xtable(nice_t_test(
+  data = Master_Spreadsheet,
+  response = c("Grade_1_Count","Shoot_Fresh_Weight","Shoot_Dry_Weight"),
+  group = "Substrate"
+))
+print(table1, comment=FALSE)
+
+```
+
+\begin{adjustwidth}{2cm}{2cm}
+
+The following table compares the performance of plants grown 
+with and without microbial inoculation without considering the
+substrate in which the plants were grown. P-values greater than 
+0.05 indicate a greater than 5% probability that the observed 
+difference occurred due to random chance.
+
+\end{adjustwidth}
+
+```{r Inoculation-t-Tests, echo=FALSE, results='asis', fig.width=6.5}
+table3=xtable(nice_t_test(
+  data = Master_Spreadsheet,
+  response = c("Grade_1_Count","Shoot_Fresh_Weight","Shoot_Dry_Weight"),
+  group = "Inoculation"
+))
+
+print(table3, comment=F)
+```
+
+# Group-by-Group t-Test p-Values
+
+\begin{adjustwidth}{2cm}{2cm}
+
+The following table provides p-values for comparisons between 
+each treatment group and each of the three other treatment groups.
+
+\end{adjustwidth}
+
+```{r t-Tables, echo=FALSE, results='asis', fig.width=6.5}
+
+# Subset for Substrate = "R" and Inoculation = "M"
+subset_RM <- subset(Master_Spreadsheet, Substrate == "R" & Inoculation == "M")
+
+# Subset for Substrate = "R" and Inoculation = "NM"
+subset_R <- subset(Master_Spreadsheet, Substrate == "R" & Inoculation == "NM")
+
+# Subset for Substrate = "P" and Inoculation = "M"
+subset_PM <- subset(Master_Spreadsheet, Substrate == "P" & Inoculation == "M")
+
+# Subset for Substrate = "P" and Inoculation = "NM"
+subset_P <- subset(Master_Spreadsheet, Substrate == "P" & Inoculation == "NM")
+
+RvP_G1Count = t.test(Master_Spreadsheet$Grade_1_Count~Master_Spreadsheet$Substrate)
+MvNM_G1Count= t.test(Master_Spreadsheet$Grade_1_Count~Master_Spreadsheet$Inoculation)
+RvP_G1Count = t.test(Master_Spreadsheet$Shoot_Fresh_Weight~Master_Spreadsheet$Substrate)
+MvNM_G1Count= t.test(Master_Spreadsheet$Shoot_Fresh_Weight~Master_Spreadsheet$Inoculation)
+RvP_G1Count = t.test(Master_Spreadsheet$Shoot_Dry_Weight~Master_Spreadsheet$Substrate)
+MvNM_G1Count= t.test(Master_Spreadsheet$Shoot_Dry_Weight~Master_Spreadsheet$Inoculation)
+
+
+
+RMvR_G1Count = tidy(t.test(subset_RM$Grade_1_Count,subset_R$Grade_1_Count))
+RMvP_G1Count = tidy(t.test(subset_RM$Grade_1_Count,subset_P$Grade_1_Count))
+RMvPM_G1Count = tidy(t.test(subset_RM$Grade_1_Count,subset_PM$Grade_1_Count))
+RvP_G1Count = tidy(t.test(subset_R$Grade_1_Count,subset_P$Grade_1_Count))
+RvPM_G1Count = tidy(t.test(subset_R$Grade_1_Count,subset_PM$Grade_1_Count))
+PvPM_G1Count = tidy(t.test(subset_P$Grade_1_Count,subset_PM$Grade_1_Count))
+
+RMvR_Fresh_Weight = tidy(t.test(subset_RM$Shoot_Fresh_Weight,subset_R$Shoot_Fresh_Weight))
+RMvP_Fresh_Weight = tidy(t.test(subset_RM$Shoot_Fresh_Weight,subset_P$Shoot_Fresh_Weight))
+RMvPM_Fresh_Weight = tidy(t.test(subset_RM$Shoot_Fresh_Weight,subset_PM$Shoot_Fresh_Weight))
+RvP_Fresh_Weight = tidy(t.test(subset_R$Shoot_Fresh_Weight,subset_P$Shoot_Fresh_Weight))
+RvPM_Fresh_Weight = tidy(t.test(subset_R$Shoot_Fresh_Weight,subset_PM$Shoot_Fresh_Weight))
+PvPM_Fresh_Weight = tidy(t.test(subset_P$Shoot_Fresh_Weight,subset_PM$Shoot_Fresh_Weight))
+
+RMvR_Dry_Weight = tidy(t.test(subset_RM$Shoot_Dry_Weight,subset_R$Shoot_Dry_Weight))
+RMvP_Dry_Weight = tidy(t.test(subset_RM$Shoot_Dry_Weight,subset_P$Shoot_Dry_Weight))
+RMvPM_Dry_Weight = tidy(t.test(subset_RM$Shoot_Dry_Weight,subset_PM$Shoot_Dry_Weight))
+RvP_Dry_Weight = tidy(t.test(subset_R$Shoot_Dry_Weight,subset_P$Shoot_Dry_Weight))
+RvPM_Dry_Weight = tidy(t.test(subset_R$Shoot_Dry_Weight,subset_PM$Shoot_Dry_Weight))
+PvPM_Dry_Weight = tidy(t.test(subset_P$Shoot_Dry_Weight,subset_PM$Shoot_Dry_Weight))
+
+G1Count_P_Values = c(
+  RMvR_G1Count$p.value,
+  RMvP_G1Count$p.value,
+  RMvPM_G1Count$p.value,
+  RvP_G1Count$p.value,
+  RvPM_G1Count$p.value,
+  PvPM_G1Count$p.value)
+
+Fresh_Weight_P_Values = c(
+  RMvR_Fresh_Weight$p.value,
+  RMvP_Fresh_Weight$p.value,
+  RMvPM_Fresh_Weight$p.value,
+  RvP_Fresh_Weight$p.value,
+  RvPM_Fresh_Weight$p.value,
+  PvPM_Fresh_Weight$p.value)
+
+Dry_Weight_P_Values = c(
+  RMvR_Dry_Weight$p.value,
+  RMvP_Dry_Weight$p.value,
+  RMvPM_Dry_Weight$p.value,
+  RvP_Dry_Weight$p.value,
+  RvPM_Dry_Weight$p.value,
+  PvPM_Dry_Weight$p.value)
+
+P_Table_Cols = c("RM Vs. R","RM Vs. P","RM Vs. PM","R Vs. P","R Vs. PM","P Vs. PM")
+P_Table_Rows = c("Count of Green Fruit","Fresh Weight","Dry Weight")
+
+table=data.frame(Comparison=P_Table_Cols, Grade_1_Count=G1Count_P_Values, Fresh_Weight=Fresh_Weight_P_Values, Dry_Weight=Dry_Weight_P_Values)
+
+table2=xtable(table)
+print(table2, comment=FALSE)
+
+```
+
+# Boxplots
+
+\begin{adjustwidth}{2cm}{2cm}
+
+The following boxplots allow visual comparison of each of the 
+four treatment groups as analyzed using t-tests in the previous 
+step. These boxplots are marked with letters which show 
+statistically significant differences; boxplots with the same 
+letter represent groups that are NOT significantly different 
+from one another.
+
+The black line represents the median value of the group.
+The black dot represents the mean of each group. The grey 
+box represents the middle 50% of observations. The whiskers 
+represent the furthest edge cases within 1.5 times the 
+interquartile range from the 25th and 75th percentiles. 
+Circles beyond the whiskers represent possible outliers.
+
+\end{adjustwidth}
+
+## Count of Green Fruit
+
+```{r Grade_One_Count_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Grade_1_Count ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Count\nof\nGreen\nFruit\n(Grade 1)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Grade_1_Count)), las = 1, adj=0.5)
+
+means <- aggregate(Grade_1_Count ~ Inoculation + Substrate, data = Master_Spreadsheet, FUN = mean)$Grade_1_Count
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means + 3,  # `means + 2` adjusts the position above the mean bars
+     labels = c('a', 'a', 'b', 'ab'), 
+     cex = 0.8)
+
+```
+
+## Count of Red Fruit
+
+```{r Grade_Five_Six_Count_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Grade_5_6_Count ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Count\nof\nRed\nFruit\n(Grades 5 & 6)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Grade_5_6_Count)), las = 1, adj=0.5)
+
+means <- aggregate(Grade_5_6_Count ~ Inoculation + Substrate, data = Master_Spreadsheet, FUN = mean)$Grade_5_6_Count
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means + 0.5,
+     labels = c('a', 'a', 'a', 'a'), 
+     cex = 0.8)
+```
+
+## Shoot Fresh Weight
+
+```{r Shoot_Fresh_Weight_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Shoot_Fresh_Weight ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Shoot\nFresh\nWeight (g)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Shoot_Fresh_Weight)), las = 1, adj=0.5)
+
+means <- aggregate(Shoot_Fresh_Weight ~ Inoculation + Substrate, data = Master_Spreadsheet, FUN = mean)$Shoot_Fresh_Weight
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means -6,
+     labels = c('a', 'a', 'b', 'b'), 
+     cex = 0.8)
+```
+
+## Shoot Dry Weight
+
+```{r Shoot_Dry_Weight_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Shoot_Dry_Weight ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Shoot\nDry\nWeight (g)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Shoot_Dry_Weight)), las = 1, adj=0.5)
+
+means <- aggregate(Shoot_Dry_Weight ~ Inoculation + Substrate,
+                   data = Master_Spreadsheet,
+                   FUN = mean)$Shoot_Dry_Weight
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means - 1,
+     labels = c('a', 'a', 'b', 'b'), 
+     cex = 0.8)
+```
+
+## Red Fruit Weight
+
+```{r Red_Fruit_Weight_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Grade_5_6_Weight ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Red\nFruit\n(Grades 5\nand 6)\nFresh\nWeight (g)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Grade_5_6_Weight)), las = 1, adj=0.5)
+
+means <- aggregate(Grade_5_6_Weight ~ Inoculation + Substrate,
+                   data = Master_Spreadsheet,
+                   FUN = mean)$Grade_5_6_Weight
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means - 12,
+     labels = c('a', 'a', 'a', 'a'), 
+     cex = 0.8)
+```
+
+## Total Edible Biomass
+
+```{r All_Grades_Weight_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        All_Grades_Weight ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Total\nEdible\nBiomass\n(g)", side = 2, line = 4, at = mean(range(Master_Spreadsheet$All_Grades_Weight)), las = 1, adj=0.5)
+
+means <- aggregate(All_Grades_Weight ~ Inoculation + Substrate,
+                   data = Master_Spreadsheet,
+                   FUN = mean)$All_Grades_Weight
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means - 12,
+     labels = c('a', 'a', 'a', 'a'), 
+     cex = 0.8)
+```
+
+## Brix
+
+```{r Brix_Box_Plots, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center'}
+par(mar = c(5, 6, 4, 2) + 1)
+boxplot(
+        Average_Brix ~ Inoculation*Substrate, 
+        
+        data=Master_Spreadsheet, 
+        xlab="Treatment", 
+        ylab="", 
+        names=c('Inoculated\nPerlite',
+                'Non-inoculated\nPerlite',
+                'Inoculated\nRegolith',
+                'Non-inoculated\nRegolith'),
+        cex.axis=0.63,
+        las=1
+        )
+mtext("Average\nBrix", side = 2, line = 4, at = mean(range(Master_Spreadsheet$Average_Brix)), las = 1, adj=0.5)
+
+means <- aggregate(Average_Brix ~ Inoculation + Substrate,
+                   data = Master_Spreadsheet,
+                   FUN = mean)$Average_Brix
+
+points(1:4, means, col = "black", pch=16)
+
+text(1:4, means - 0.05,
+     labels = c('a', 'a', 'a', 'a'), 
+     cex = 0.8)
+```
+
+```{r, xtable-&-R-Version-Statement, echo=FALSE, fig.height=7, fig.width=5.5, fig.align='center', results='asis'}
+cat(
+paste0(
+  "% latex tables generated in ", 
+  sub(" \\(.*$", "", R.version$version.string), 
+  " by xtable ", 
+  packageVersion("xtable"), 
+  " package % ",
+  format(Sys.time(), "%a %b %d %H:%M:%S %Y"))
+)
+```

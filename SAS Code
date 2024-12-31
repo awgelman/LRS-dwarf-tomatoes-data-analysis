@@ -1,0 +1,94 @@
+PROC IMPORT datafile='/home/u63103040/My Files/Thesis Experiment 1/Datasets/Master_Spreadsheet.csv'
+ 	dbms=CSV
+ 	out=Data
+ 	replace;
+ 	getnames=YES;
+RUN;
+  
+/*Disables output to prevent the printing of unnecessary information (output is later re-enabled)*/
+ods exclude all;
+     
+/*This glm procedure generates a linear model according to all below specified response and explanatory variables in the imported dataset*/
+PROC GLM data=Data MANOVA;
+     
+    /*Prepares explanatory variables for use in the model statement*/
+    class Substrate Inoculation;
+     
+     
+    model
+   	/*Specifies response variables*/
+        Grade_1_Count
+        Grade_1_Weight
+        Grade_1_Avg_Weight
+        Grade_2_4_Count
+        Grade_2_4_Weight
+        Grade_2_4_Avg_Weight
+        Grade_5_6_Count
+        Grade_5_6_Weight
+        Grade_5_6_Avg_Weight
+        Average_Brix
+        Week_2_Height
+        Week_3_Height
+        Week_4_Height
+        Week_5_Height
+        Week_6_Height
+        Est_Growth_Rate
+        Shoot_Fresh_Weight
+        Shoot_Dry_Weight
+        All_Grades_Weight
+        
+        /*Specifies explanatory variables ("|" adds the interaction term)*/
+        = Substrate|Inoculation;
+    
+    /*Requests multiple analysis of variance*/
+    MANOVA H = Substrate Inoculation Substrate*Inoculation;
+    
+    /*Accounts for missing data*/
+    lsmeans Substrate|Inoculation / pdiff=all;
+    means Substrate Inoculation / tukey alpha=0.05;
+    /*Stops proc glm from printing all information and places specific ANOVA information into the PValues variable for later use*/
+    
+    ods output ModelANOVA = PValues;
+    ods output meanplot = MeanPlots;
+    store out = GLM_Results;
+  
+RUN;
+  
+/*re-enables output for the below print procedures*/
+ ods select all;
+  
+/*Sorts the p-value data for the transpose procedure*/
+PROC SORT data=PValues;
+    where HypothesisType = 3 /*Drops type-1 analysis output*/;
+    by Source Dependent /*This order is important for the transpose procedure*/;
+RUN;
+ 
+/*Uses the data from the PValues variable to generate a p-value table with all type 3 p-Values*/
+PROC TRANSPOSE data=PValues out=FullPTable(drop= _NAME_ _LABEL_ /*trims unnecessary table components*/);
+    by Source; /* Places the 'Source' values as column headers */
+    id Dependent; /* Places the 'Dependent' values as row headers */
+    var ProbF; /* Places the 'ProbF' values in the cells */
+RUN;
+  
+/*Uses the data from the PValues variable to generate a p-value table with significant type 3 p-Values*/
+PROC TRANSPOSE data=PValues out=SigPTable(drop= _NAME_ _LABEL_ /*trims unnecessary table components*/);
+    by Source; /* Places the 'Source' values as column headers */
+    id Dependent; /* Places the 'Dependent' values as row headers */
+    var ProbF; /* Places the 'ProbF' values in the cells */
+    where ProbF < 0.05;
+RUN;
+ 
+/*Prints a p-value table with all p-values displayed, including insignificant ones*/
+PROC PRINT data=FullPTable;
+    title "P-Value Table (All Values)";
+RUN;
+  
+/*Prints a p-Table with only significant p-values displayed*/
+PROC PRINT data=SigPTable;
+    title "P-Value Table (Significant Values)";
+RUN;
+ 
+/* PROC PLM restore=GLM_Results; */
+/* 	title "Mean Plots"; */
+/* 	effectplot interaction(x=Substrate sliceby=Inoculation) / clm connect; */
+/* RUN; */

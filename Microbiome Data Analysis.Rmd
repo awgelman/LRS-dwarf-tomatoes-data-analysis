@@ -1,0 +1,117 @@
+---
+title: "Microbiome Data Analysis"
+output:
+  pdf_document: default
+date: "2025-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gplots)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(Polychrome)
+library(forcats)
+library(Heatplus)
+library(dplyr)
+library(RColorBrewer)
+library(vegan)
+```
+
+```{r Percent_Stacked_Chart, echo = FALSE}
+#Importing the Data
+Data = readxl::read_excel("C:/Users/Gelman/OneDrive/Documents/Documents/Post-College/2025/Journal Article/Microbiome_Data.xlsx")
+
+
+
+#Transforming the Data for ggplot
+Trans_Data <- Data %>%
+  pivot_longer(cols = -OTU_ID, names_to = "Treatment", values_to = "Abundance") %>%
+  group_by(Treatment) %>%
+  mutate(Percentage = Abundance / sum(Abundance) * 100)
+
+
+
+#Flips the data upside-down for parity with the Zymo figure
+Trans_Data$OTU_ID = fct_rev(Trans_Data$OTU_ID)
+
+
+
+#Puts the treatments in a specific order for parity with the Zymo figure
+Trans_Data$Treatment <- factor(Trans_Data$Treatment, levels = c("R.Mid", "P.Mid", "PM.Mid", "R.Final", "RM.Final", "P.Final", "PM.Final"))
+
+
+
+# Removes all cyanobacteria from the data
+Trans_Data <- Trans_Data %>%
+  filter(!grepl("cyanobacteria", OTU_ID, ignore.case = TRUE))
+
+
+
+#Generating the color palette
+
+color_palette <- c(
+  "#FF0000", "#0000FF", "#F27304", "#008000", "#91278d",
+  "#ffff00", "#7cecf4", "#F49ac2", "#5da09e", "#6b440b",
+  "#808080", "#02f40e", "#f79679", "#7da9d8", "#fcc688",
+  "#80c99b", "#a287bf", "#fff899", "#c0c0c0", "#ed008a",
+  "#00b6ff", "#c49c6b", "#808000", "#8c3fff", "#bc828d",
+  "#008080", "#800000", "#2b4200", "#a54700"
+)
+
+unique_taxa = unique(Trans_Data$OTU_ID)
+repeated_palette <- rep(color_palette, length.out = length(unique_taxa))
+names(repeated_palette) <- unique_taxa
+
+
+
+#Generating the plot
+
+ggplot(Trans_Data, aes(fill = OTU_ID, y = Percentage, x=Treatment)) + geom_bar(position="fill", stat="identity") + scale_fill_manual(values = repeated_palette) + theme(legend.position = "none") 
+
+```
+```{r Heatmaps, echo = FALSE}
+
+# Removes all cyanobacteria from the data
+Data_Clean <- Data %>%
+  filter(!grepl("cyanobacteria", OTU_ID, ignore.case = TRUE))
+
+
+
+# Transpose: Make Treatments the Rows & OTU_ID the Columns
+
+Flipped_Data <- Data_Clean %>%
+  pivot_longer(cols = -OTU_ID, names_to = "Treatment", values_to = "Abundance") %>%
+  pivot_wider(names_from = OTU_ID, values_from = Abundance)
+
+#Stores the Treatment column labels
+names = Flipped_Data$Treatment
+
+#Erases the "Treatment" column in Flipped Data
+Flipped_Data = Flipped_Data[, !colnames(Flipped_Data) %in% "Treatment"]
+
+#Filters out species with a max abundance below 1%
+maxab <- apply(Flipped_Data, 2, max)
+n1 <- names(which(maxab < 0.01))
+Flipped_Data_1 <- Flipped_Data[, -which(names(Flipped_Data) %in% n1)]
+
+#Assigns the removed "Treatment" column labels to row names
+rownames(Flipped_Data_1) = names
+
+#Creates a variable storing the color palette for the heatmap
+scaleyellowred = colorRampPalette(c("lightyellow","red"), space = "rgb")(100)
+
+#Calculates the Bray-Curtis dissimilarity matrix on the full dataset:
+data.dist <- vegdist(Flipped_Data_1, method = "bray")
+ 
+#Does average linkage hierarchical clustering.
+row.clus <- hclust(data.dist, "aver")
+ 
+#Makes the heatmap with dendrograms
+heatmap(as.matrix(Flipped_Data_1), Rowv = as.dendrogram(row.clus), col = scaleyellowred, margins = c(10, 3))
+
+
+```
+The code presented on this website was used in the generation of these charts: https://www.molecularecologist.com/2013/08/20/making-heatmaps-with-r-for-microbiome-analysis/
